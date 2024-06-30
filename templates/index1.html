@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deradh Image Upload</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+        form {
+            text-align: center;
+        }
+        input[type="file"] {
+            display: block;
+            margin: 10px auto;
+        }
+        .webcam-container {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .webcam-button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px auto;
+            display: block;
+        }
+        .webcam-button:hover {
+            background-color: #0056b3;
+        }
+        button[type="submit"] {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px auto;
+            display: block;
+        }
+        button[type="submit"]:hover {
+            background-color: #45a049;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
+        }
+        .output {
+            text-align: center;
+            margin-top: 20px;
+        }
+        .video-background {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            z-index: -1;
+            filter: blur(10px);
+        }
+        .video-foreground {
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: 0;
+            pointer-events: none;
+        }
+        .loading-bar {
+            width: 100%;
+            height: 5px;
+            background-color: #ddd;
+            margin-top: 10px;
+        }
+        .bar {
+            width: 0;
+            height: 100%;
+            background-color: #4CAF50;
+        }
+        #countdown {
+            font-size: 20px;
+            color: red;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Deradh. Try On</h1>
+        <form id="upload-form" method="post" enctype="multipart/form-data">
+            <label for="model_image">Model Image:</label>
+            <input type="file" name="model_image" id="model_image" accept="image/*">
+            <div class="webcam-container" id="webcam-container">
+                <button type="button" class="webcam-button" id="webcam-button">Use Webcam</button>
+                <video id="webcam" width="320" height="240" autoplay style="display: none;"></video>
+                <canvas id="canvas" width="320" height="240" style="display: none;"></canvas>
+                <button type="button" class="webcam-button" id="capture-button" style="display: none;">Capture</button>
+                <p id="countdown" style="display: none;">Capturing in <span id="timer">5</span> seconds...</p>
+            </div>
+            <label for="garment_image">Garment Image:</label>
+            <input type="file" name="garment_image" id="garment_image" accept="image/*" required>
+            <label for="category">Category:</label>
+            <select name="category" id="category" required>
+                <option value="upperbody">Upperbody</option>
+                <option value="lowerbody">Lowerbody</option>
+                <option value="dress">Dress</option>
+            </select>
+            <button type="submit">Upload</button>
+        </form>
+        <div class="loading-bar" style="display: none;">
+            <div class="bar"></div>
+        </div>
+        <div class="image-container">
+            {% if model_image %}
+            <h2>Model Image:</h2>
+            <img src="{{ model_image }}" alt="Model Image">
+            {% endif %}
+            {% if garment_image %}
+            <h2>Garment Image:</h2>
+            <img src="{{ garment_image }}" alt="Garment Image">
+            {% endif %}
+            <div class="result-container">
+                {% if result_image %}
+                <h2>Result Image:</h2>
+                <img src="{{ result_image }}" alt="Result Image">
+                {% endif %}
+            </div>
+        </div>
+        <div class="output">
+            {% if output %}
+            <h2>Output URLs:</h2>
+            <ul>
+                {% for url in output %}
+                <li><a href="{{ url }}">{{ url }}</a></li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- YouTube Video with Blurred Background -->
+    <div class="video-background">
+        <div class="video-foreground">
+            <iframe src="https://www.youtube.com/embed/Hgg7M3kSqyE?autoplay=1&loop=1&controls=0&mute=1&playlist=Hgg7M3kSqyE" frameborder="0" allowfullscreen></iframe>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('webcam-button').addEventListener('click', async () => {
+            const video = document.getElementById('webcam');
+            const canvas = document.getElementById('canvas');
+            const captureButton = document.getElementById('capture-button');
+            const webcamContainer = document.getElementById('webcam-container');
+
+            const constraints = {
+                video: true
+            };
+
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            video.srcObject = stream;
+            video.style.display = 'block';
+            captureButton.style.display = 'block';
+            webcamContainer.style.marginBottom = '20px';
+        });
+
+        document.getElementById('capture-button').addEventListener('click', () => {
+            const countdown = document.getElementById('countdown');
+            const timerElement = document.getElementById('timer');
+            countdown.style.display = 'block';
+
+            let timer = 5;
+            const interval = setInterval(() => {
+                timer--;
+                timerElement.textContent = timer;
+
+                if (timer === 0) {
+                    clearInterval(interval);
+                    countdown.style.display = 'none';
+                    capturePhoto();
+                }
+            }, 1000);
+        });
+
+        function capturePhoto() {
+            const video = document.getElementById('webcam');
+            const canvas = document.getElementById('canvas');
+            const context = canvas.getContext('2d');
+
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Convert canvas image to a file input-like object for form submission
+            canvas.toBlob(blob => {
+                const file = new File([blob], 'webcam-photo.jpg', { type: 'image/jpeg' });
+                const dataTransfer = new DataTransfer();
+                dataTransfer.items.add(file);
+
+                document.getElementById('model_image').files = dataTransfer.files;
+            });
+
+            video.srcObject.getTracks().forEach(track => track.stop());
+            video.style.display = 'none';
+            canvas.style.display = 'block';
+        }
+
+        document.getElementById('upload-form').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const loadingBar = document.querySelector('.loading-bar');
+            const bar = document.querySelector('.bar');
+            loadingBar.style.display = 'block';
+            bar.style.width = '100%';
+
+            // Delay form submission to show loading bar
+            setTimeout(() => {
+                event.target.submit();
+            }, 100);
+        });
+    </script>
+</body>
+</html>
